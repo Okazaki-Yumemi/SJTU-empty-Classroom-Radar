@@ -37,16 +37,17 @@ def home():
 # 这个是专属的数据接口，供网页上的 JavaScript 提取数据
 @app.route('/api/search', methods=['POST'])
 def search_empty_rooms():
-    # 接收网页发来的 JSON 数据
     data = request.json
+    # 获取前端传来的所有参数
+    target_date = data.get('date')  # 🌟 接收前端传来的指定日期
     building_name = data.get('building')
     start_sec = int(data.get('start_sec'))
     end_sec = int(data.get('end_sec'))
     
     build_id = BUILDING_MAP.get(building_name)
-    today_str = datetime.date.today().strftime("%Y-%m-%d")
     
-    raw_data = get_schedule_data(build_id, today_str)
+    # 用目标日期去学校服务器拉数据
+    raw_data = get_schedule_data(build_id, target_date)
     if not raw_data:
         return jsonify({"status": "error", "msg": "教务系统数据拉取失败"})
 
@@ -63,7 +64,6 @@ def search_empty_rooms():
                 c_start = course.get("startSection", 0)
                 c_end = course.get("endSection", 0)
                 
-                # 时间重叠判定逻辑
                 if not (end_sec < c_start or start_sec > c_end):
                     is_free = False
                     break 
@@ -71,11 +71,10 @@ def search_empty_rooms():
             if is_free:
                 empty_rooms.append(room.get("name"))
                 
-    # 把结果打包成 JSON 发回给网页
     return jsonify({
         "status": "success", 
         "rooms": empty_rooms,
-        "date": today_str
+        "date": target_date  # 🌟 返回查询的那个日期，显示在结果里
     })
 
 if __name__ == '__main__':

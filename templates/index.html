@@ -36,6 +36,12 @@
         </div>
 
         <div class="form-group">
+            <label>查询日期</label>
+            <select id="query-date">
+                </select>
+        </div>
+
+        <div class="form-group">
             <label>开始节次</label>
             <select id="start-sec">
                 <option value="1">第1节 (08:00)</option>
@@ -88,13 +94,38 @@
         </div>
         </div>
 
-    <script>
+<script>
+        // 🌟 新增功能：网页加载时，自动生成今天及未来6天的日期
+        window.onload = function() {
+            const dateSelect = document.getElementById('query-date');
+            const today = new Date();
+            const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+            for (let i = 0; i < 7; i++) {
+                let d = new Date(today);
+                d.setDate(today.getDate() + i);
+                
+                let yyyy = d.getFullYear();
+                let mm = String(d.getMonth() + 1).padStart(2, '0');
+                let dd = String(d.getDate()).padStart(2, '0');
+                let dateStr = `${yyyy}-${mm}-${dd}`;
+                
+                let dayName = i === 0 ? '今天' : days[d.getDay()];
+                
+                let option = document.createElement('option');
+                option.value = dateStr;
+                option.text = `${dateStr} (${dayName})`;
+                dateSelect.appendChild(option);
+            }
+        };
+
         async function searchRooms() {
             const btn = document.querySelector('button');
             const resultBox = document.getElementById('result-box');
             const roomList = document.getElementById('room-list');
             const resultTitle = document.getElementById('result-title');
 
+            const queryDate = document.getElementById('query-date').value; // 获取选择的日期
             const building = document.getElementById('building').value;
             const startSec = document.getElementById('start-sec').value;
             const endSec = document.getElementById('end-sec').value;
@@ -108,10 +139,16 @@
             btn.disabled = true;
 
             try {
+                // 把日期(date)也打包发给后端
                 const response = await fetch('/api/search', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ building: building, start_sec: startSec, end_sec: endSec })
+                    body: JSON.stringify({ 
+                        date: queryDate, 
+                        building: building, 
+                        start_sec: startSec, 
+                        end_sec: endSec 
+                    })
                 });
                 
                 const data = await response.json();
