@@ -12,7 +12,17 @@
         button { background-color: #c01920; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; }
         button:hover { background-color: #a0151a; }
         #result-box { margin-top: 20px; padding: 15px; border-radius: 6px; background-color: #eef2f5; text-align: left; display: none; }
-        .room-tag { display: inline-block; background: #fff; border: 1px solid #dcdfe6; padding: 5px 10px; margin: 5px; border-radius: 4px; font-size: 14px; }
+        .room-card { 
+            display: inline-block; background: white; border-left: 5px solid #27ae60; 
+            padding: 15px; margin: 10px; border-radius: 10px; text-align: left;
+            width: 160px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); vertical-align: top;
+        }
+        .room-card.has-lesson { border-left-color: #e74c3c; } /* 有课时侧边变红 */
+        .room-name { font-weight: bold; font-size: 18px; margin-bottom: 8px; color: #2c3e50; }
+        .data-row { font-size: 13px; margin: 4px 0; color: #555; display: flex; align-items: center; }
+        .data-icon { margin-right: 8px; width: 16px; text-align: center; }
+        .progress-bar { height: 6px; background: #eee; border-radius: 3px; margin: 8px 0; overflow: hidden; }
+        .progress-fill { height: 100%; background: #27ae60; }
         .footer-decoration { text-align: center; margin-top: 40px; }
         .footer-decoration img { width: 120px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .footer-decoration p { font-size: 12px; color: #888; margin-top: 8px; }
@@ -125,7 +135,7 @@
             const roomList = document.getElementById('room-list');
             const resultTitle = document.getElementById('result-title');
 
-            const queryDate = document.getElementById('query-date').value; // 获取选择的日期
+            const queryDate = document.getElementById('query-date').value;
             const building = document.getElementById('building').value;
             const startSec = document.getElementById('start-sec').value;
             const endSec = document.getElementById('end-sec').value;
@@ -139,7 +149,6 @@
             btn.disabled = true;
 
             try {
-                // 把日期(date)也打包发给后端
                 const response = await fetch('/api/search', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -150,18 +159,70 @@
                         end_sec: endSec 
                     })
                 });
-                
+        
                 const data = await response.json();
 
                 if (data.status === 'success') {
                     resultTitle.innerText = `✅ ${data.date} 找到 ${data.rooms.length} 间空闲教室：`;
-                    roomList.innerHTML = data.rooms.map(room => `<span class="room-tag">${room}</span>`).join('');
+                    
+                    // 🌟 核心：清洗与渲染逻辑
+                    roomList.innerHTML = data.rooms.map(room => {
+                        const name = room.name || "未知教室";
+                        const info = room.info || {};
+
+                        // 判定是否真的拿到了实时传感器数据 (检查核心字段 actual 是否存在)
+                        const hasSensor = info.actual !== undefined;
+
+                        if (!hasSensor || Object.keys(info).length === 0) {
+                            return `
+                                <div class="room-card" style="border-left-color: #ccc;">
+                                    <div class="room-name">${name}</div>
+                                    <div class="room-detail" style="color: #999; font-size: 12px;">📡 传感器暂无数据</div>
+                                </div>`;
+                        }
+
+                        // 提取数据，提供默认值防止报错
+                        const actual = info.actual ?? 0;
+                        const total = info.total ?? "-";
+                        const temp = info.temp ?? "-";
+                        const hum = info.hum ?? "-";
+                        const co2 = info.co2 ?? "-";
+                        const pm25 = info.pm25 ?? "-";
+
+                        // 计算拥挤度进度条 (防止除以0)
+                        let occupancy = 0;
+                        if (total !== "-" && total > 0) {
+                            occupancy = Math.round((actual / total) * 100);
+                        }
+                        const barColor = occupancy > 80 ? '#e74c3c' : (occupancy > 50 ? '#f39c12' : '#27ae60');
+
+                        // 返回精美的 HTML 卡片
+                        return `
+                            <div class="room-card">
+                                <div class="room-name">${name}</div>
+                                <div class="data-row">
+                                    <span class="data-icon">👥</span> 
+                                    <b>${actual} / ${total} 人</b>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${occupancy}%; background: ${barColor}"></div>
+                                </div>
+                                <div class="data-row">
+                                    <span class="data-icon">🌡️</span> ${temp}℃ / ${hum}%
+                                </div>
+                                <div class="data-row" style="font-size: 11px; color: #888; margin-top: 5px;">
+                                    🍃 CO2: ${co2} | PM2.5: ${pm25}
+                                </div>
+                            </div>`;
+                    }).join('');
+                    
                     resultBox.style.display = 'block';
                 } else {
                     alert("获取失败：" + data.msg);
                 }
             } catch (error) {
-                alert("网络好像出错了...");
+                console.error("Fetch Error:", error);
+                alert("网络好像出错了，请检查服务器连接。");
             } finally {
                 btn.innerText = "一键寻找空闲教室";
                 btn.disabled = false;
